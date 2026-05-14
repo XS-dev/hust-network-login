@@ -18,19 +18,9 @@
 
 ## 下载与运行
 
-### 方式一：自包含版本（推荐，无需安装任何运行时）
+从 [Releases](https://github.com/XS-dev/hust-network-login/releases) 下载 `HustLogin-v2.0.0-win-x64.exe`，双击运行，无需安装任何运行时。
 
-从 [Releases](https://github.com/XS-dev/hust-network-login/releases) 下载自包含版本 `HustLogin.exe`（约 72MB），放入任意文件夹，双击运行。
-
-> 此版本内置完整 .NET 10 运行时，适用于任何 Windows 10 x64 及以上系统。
-
-### 方式二：框架依赖版本（体积小，需 .NET 10 运行时）
-
-下载 `publish-fd.zip`（exe 仅 159KB），解压后双击 `启动.bat`。
-
-> 如未安装 .NET 10 运行时，启动脚本会自动检测并打开微软官方下载页面。安装 "Desktop Runtime 10.0.x" x64 版本后即可运行。
-
-### 方式三：Rust 原版命令行（跨平台/嵌入式）
+### Rust 原版命令行（跨平台/嵌入式）
 
 从原项目 [black-binary/hust-network-login](https://github.com/black-binary/hust-network-login) 下载对应平台的静态链接可执行文件（约 400KB），命令行运行：
 
