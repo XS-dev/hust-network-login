@@ -2,7 +2,7 @@
 
 华中科技大学校园网自动登录客户端，基于 WPF (.NET 10) 开发，支持图形界面与系统托盘后台运行。
 
-> 本项目登录协议及加密算法参考自 [black-binary/hust-network-login](https://github.com/black-binary/hust-network-login)。
+> 本项目登录协议及加密算法参考自 [black-binary/hust-network-login](https://github.com/black-binary/hust-network-login)（极简 Rust 原版）。
 
 ## 功能特性
 
@@ -20,19 +20,27 @@
 
 ### 方式一：自包含版本（推荐，无需安装任何运行时）
 
-下载 `publish/HustLogin.exe`（约 72MB），放入任意文件夹，双击运行。
+从 [Releases](https://github.com/XS-dev/hust-network-login/releases) 下载自包含版本 `HustLogin.exe`（约 72MB），放入任意文件夹，双击运行。
 
 > 此版本内置完整 .NET 10 运行时，适用于任何 Windows 10 x64 及以上系统。
 
 ### 方式二：框架依赖版本（体积小，需 .NET 10 运行时）
 
-下载 `publish-fd/` 整个文件夹（exe 仅 159KB），双击 `启动.bat`。
+下载 `publish-fd.zip`（exe 仅 159KB），解压后双击 `启动.bat`。
 
-> 如未安装 .NET 10 运行时，启动脚本会自动打开微软官方下载页面。安装 "Desktop Runtime 10.0.x" x64 版本后即可运行。
+> 如未安装 .NET 10 运行时，启动脚本会自动检测并打开微软官方下载页面。安装 "Desktop Runtime 10.0.x" x64 版本后即可运行。
 
-## 配置说明
+### 方式三：Rust 原版命令行（跨平台/嵌入式）
 
-程序自动读取同目录下的 `my.conf` 文件，格式为 3 行：
+从原项目 [black-binary/hust-network-login](https://github.com/black-binary/hust-network-login) 下载对应平台的静态链接可执行文件（约 400KB），命令行运行：
+
+```shell
+./hust-network-login ./my.conf
+```
+
+## 配置文件
+
+`my.conf` 位于程序同目录，格式为 3 行：
 
 ```
 学号/工号
@@ -40,7 +48,7 @@
 检测间隔秒数（可选，默认 60）
 ```
 
-也可以在 GUI 界面中直接填写并保存，无需手动编辑配置文件。
+也可以在 GUI 界面中直接填写并保存。
 
 ## 项目结构
 
@@ -56,18 +64,19 @@ HustLoginWpf/              # WPF 主项目
 ├── 启动.bat               # 框架依赖版启动器
 └── HustLogin.csproj       # 项目文件
 
-hust-network-login-src/    # 原始 Rust 项目（参考）
+hust-network-login-src/    # 原始 Rust 项目（black-binary/hust-network-login）
 gui.bat                    # 一键启动脚本
 login.bat                  # 原始命令行启动脚本
 ```
 
 ## 编译
 
+### WPF 版本
+
 ```bash
 # 安装 .NET 10 SDK
 winget install Microsoft.DotNet.SDK.10
 
-# 进入项目目录
 cd HustLoginWpf
 
 # 框架依赖版（小体积）
@@ -81,6 +90,20 @@ dotnet publish -c Release -r win-x64 --self-contained true \
   -o publish
 ```
 
+### Rust 原版
+
+```bash
+cargo build --release
+strip ./target/release/hust-network-login
+```
+
+交叉编译推荐使用 `cross`：
+
+```bash
+cargo install cross
+cross build --release --target mips-unknown-linux-musl
+```
+
 ## 登录原理
 
 1. GET `http://www.baidu.com` 检测是否已被校园网劫持
@@ -90,11 +113,15 @@ dotnet publish -c Release -r win-x64 --self-contained true \
 
 ## 技术栈
 
-- .NET 10 WPF
-- C# 13
+### WPF 版
+- .NET 10 WPF / C# 13
 - System.Drawing（图标渲染）
 - System.Net.Http（HTTP 请求）
 - System.Numerics（大数 RSA 加密）
+
+### Rust 原版
+- Rust / minreq
+- num-bigint（RSA 加密）
 
 ## 致谢
 

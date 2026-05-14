@@ -1,0 +1,35 @@
+[package]
+name = "hust-network-login"
+version = "0.1.3"
+authors = ["black-binary <blackbinary@qq.com>"]
+edition = "2021"
+
+[dependencies]
+minreq = {version = "2.6", features = [], default-features = false}
+urlencoding = "2.1"
+num-bigint = "0.4.3"
+
+[profile.release]
+lto = "fat"
+opt-level = 'z'
+panic = 'abort'
+strip = true
+
+[package.metadata.deb]
+maintainer = 'Seas0 <season1277@outlook.com>'
+extended-description = """\
+为嵌入式设备设计的最小化华中科技大学校园网络认证工具\
+"""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+  ['target/release/hust-network-login', 'usr/bin/hust-network-login', '755'],
+  ['hust-network-login.conf', 'etc/hust-network-login.conf', '644'],
+  ['README.md', 'usr/share/doc/hust-network-login/README.md', '644'],
+]
+conf-files = [
+  '/etc/hust-network-login.conf',
+]
+maintainer-scripts = 'debian/'
+systemd-units = { enable = true }

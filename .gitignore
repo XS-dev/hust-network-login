@@ -6,6 +6,7 @@ hust-network-login-src/target/
 # IDE
 .vs/
 .idea/
+.vscode/
 *.user
 *.suo
 
@@ -22,7 +23,10 @@ publish/
 publish-fd/
 
 # Config with credentials
-my.conf
+*.conf
+
+# Archives
+*.zip
 
 # Python temp
 __pycache__/
