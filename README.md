@@ -71,26 +71,33 @@ login.bat                  # 原始命令行启动脚本
 
 ### macOS 版本（菜单栏应用）
 
-需要 Python 3 和 rumps 库：
+**方式一：Homebrew 安装（推荐）**
 
 ```bash
-# 一键安装
-cd mac && bash setup.sh
+brew tap XS-dev/hust-network-login
+brew install hust-network-login
+hust-login
+```
 
-# 或手动安装
-pip3 install rumps
-cp my.conf.example ~/.hust-login/my.conf
-# 编辑 ~/.hust-login/my.conf 填入账号密码
+**方式二：下载 DMG**
 
-# 运行
+从 [Releases](https://github.com/XS-dev/hust-network-login/releases) 下载 `.dmg`，拖入 Applications，双击运行。
+
+**方式三：源码运行**
+
+```bash
+cd mac
+bash setup.sh      # 一键安装配置
 python3 HustLogin.py
 ```
 
-> macOS 会在菜单栏显示 🟢🟠🔴 状态图标。配置文件位于 `~/.hust-login/my.conf`。
+**构建 DMG（开发者）：**
 
-配置格式与 Windows 版相同（3 行：账号、密码、间隔秒数）。
-
-偏好设置可从菜单栏图标 → "偏好设置..." 直接修改。
+```bash
+cd mac
+pip3 install py2app rumps
+bash build_dmg.sh   # 生成 dist/HUST Login.app 和 .dmg
+```
 
 ## 编译
 
