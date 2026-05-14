@@ -1,6 +1,6 @@
 # HUST 校园网自动登录工具
 
-华中科技大学校园网自动登录客户端，基于 WPF (.NET 10) 开发，支持图形界面与系统托盘后台运行。
+华中科技大学校园网自动登录客户端，支持 **Windows（WPF 图形界面）** 和 **macOS（菜单栏应用）**。
 
 > 本项目登录协议及加密算法参考自 [black-binary/hust-network-login](https://github.com/black-binary/hust-network-login)（极简 Rust 原版）。
 
@@ -69,9 +69,32 @@ gui.bat                    # 一键启动脚本
 login.bat                  # 原始命令行启动脚本
 ```
 
+### macOS 版本（菜单栏应用）
+
+需要 Python 3 和 rumps 库：
+
+```bash
+# 一键安装
+cd mac && bash setup.sh
+
+# 或手动安装
+pip3 install rumps
+cp my.conf.example ~/.hust-login/my.conf
+# 编辑 ~/.hust-login/my.conf 填入账号密码
+
+# 运行
+python3 HustLogin.py
+```
+
+> macOS 会在菜单栏显示 🟢🟠🔴 状态图标。配置文件位于 `~/.hust-login/my.conf`。
+
+配置格式与 Windows 版相同（3 行：账号、密码、间隔秒数）。
+
+偏好设置可从菜单栏图标 → "偏好设置..." 直接修改。
+
 ## 编译
 
-### WPF 版本
+### Windows WPF 版本
 
 ```bash
 # 安装 .NET 10 SDK
