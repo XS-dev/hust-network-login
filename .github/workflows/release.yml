@@ -1,0 +1,101 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  # ── Windows ──────────────────────────────────────────────────
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish self-contained
+        run: |
+          cd HustLoginWpf
+          dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true -o ../publish
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: publish/HustLogin.exe
+
+  # ── macOS ────────────────────────────────────────────────────
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install deps & build .app
+        run: |
+          pip3 install py2app rumps
+          cd mac
+          python3 setup.py py2app
+
+      - name: Create DMG
+        run: |
+          APP="mac/dist/HUST Login.app"
+          DMG_TMP="mac/build/dmg_tmp"
+          mkdir -p "$DMG_TMP"
+          cp -R "$APP" "$DMG_TMP/"
+          ln -s /Applications "$DMG_TMP/Applications"
+          hdiutil create -volname "HUST Login" \
+            -srcfolder "$DMG_TMP" \
+            -ov -format UDZO \
+            mac/HustLogin-${GITHUB_REF_NAME}.dmg
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: mac/HustLogin-*.dmg
+
+      - name: Upload macOS app (zip)
+        run: |
+          cd mac/dist
+          zip -r ../../HustLogin-macOS.zip "HUST Login.app"
+          cd ../..
+        shell: bash
+
+      - name: Upload macOS zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: HustLogin-macOS.zip
+
+  # ── Release ──────────────────────────────────────────────────
+  release:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*'
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "HUST 校园网登录 ${{ github.ref_name }}"
+          files: |
+            HustLogin.exe
+            HustLogin-*.dmg
+            HustLogin-macOS.zip
+          generate_release_notes: true

@@ -74,7 +74,7 @@ login.bat                  # 原始命令行启动脚本
 **方式一：Homebrew 安装（推荐）**
 
 ```bash
-brew tap XS-dev/hust-network-login
+brew tap XS-dev/tap https://github.com/XS-dev/hust-network-login
 brew install hust-network-login
 hust-login
 ```
