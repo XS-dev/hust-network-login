@@ -6,10 +6,9 @@
 
 | 平台 | 文件 | 怎么用 |
 |------|------|--------|
-| 🪟 Windows | `HustLogin-v2.0.0-win-x64.exe` | 下载双击运行，无需安装任何东西 |
+| 🪟 Windows（推荐） | `HustLogin-v2.0.0-win-x64.exe` | 下载双击运行，无需安装任何东西 |
+| 🪟 Windows（轻量） | `HustLogin-v2.0.0-fd.zip` | 体积小，需 .NET 10 运行时。解压后双击 `启动.bat`，如未安装运行时会自动打开下载页 |
 | 🍎 macOS | `HustLogin-v2.0.0.dmg` | 拖入 Applications，双击运行 |
-
-> Windows 版为自包含单文件，内置运行时，任何 Win10 以上电脑均可直接运行，不需要安装 .NET。
 
 ## 致谢
 

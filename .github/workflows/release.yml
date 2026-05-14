@@ -24,11 +24,20 @@ jobs:
           dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:IncludeNativeLibrariesForSelfExtract=true /p:EnableCompressionInSingleFile=true -o ../publish
           Rename-Item ../publish/HustLogin.exe "HustLogin-${{ github.ref_name }}-win-x64.exe"
 
-      - name: Upload Windows artifact
+      - name: Publish framework-dependent
+        run: |
+          cd HustLoginWpf
+          dotnet publish -c Release -r win-x64 -o ../publish-fd
+          Copy-Item 启动.bat ../publish-fd/启动.bat
+          Compress-Archive -Path ../publish-fd/* -DestinationPath ../publish/HustLogin-${{ github.ref_name }}-fd.zip
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: windows-exe
-          path: publish/HustLogin-*.exe
+          path: |
+            publish/HustLogin-*-win-x64.exe
+            publish/HustLogin-*-fd.zip
 
   # ── macOS ────────────────────────────────────────────────────
   macos:
@@ -97,6 +106,7 @@ jobs:
           name: "HUST 校园网登录 ${{ github.ref_name }}"
           files: |
             HustLogin-*-win-x64.exe
+            HustLogin-*-fd.zip
             HustLogin-*.dmg
             HustLogin-macOS.zip
           generate_release_notes: true
