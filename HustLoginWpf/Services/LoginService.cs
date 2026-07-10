@@ -1,27 +1,50 @@
 using System.IO;
+using System.Text;
 using System.Net.Http;
 
 namespace HustLogin.Services;
 
 public class LoginService : IDisposable
 {
-    public void Dispose() => _client.Dispose();
     private readonly HttpClient _client;
+    private static readonly string LogPath = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "error.log");
 
     public LoginService()
     {
         _client = new HttpClient(new HttpClientHandler
         {
+            // The portal response itself contains the information needed for login.
             AllowAutoRedirect = false
-        });
+        })
+        {
+            Timeout = TimeSpan.FromSeconds(10)
+        };
         _client.DefaultRequestHeaders.UserAgent.ParseAdd("hust-network-login");
-        _client.Timeout = TimeSpan.FromSeconds(10);
+        _client.DefaultRequestHeaders.Accept.ParseAdd("*/*");
+    }
+
+    public void Dispose() => _client.Dispose();
+
+    private static void LogError(string msg)
+    {
+        try { File.AppendAllText(LogPath, $"[{DateTime.Now:HH:mm:ss}] ERROR {msg}\n"); }
+        catch { }
     }
 
     public async Task<bool> LoginAsync(string username, string password)
     {
-        var resp = await _client.GetAsync("http://www.baidu.com");
-        var body = await resp.Content.ReadAsStringAsync();
+        string body;
+        try
+        {
+            using var response = await _client.GetAsync("http://www.baidu.com");
+            body = await response.Content.ReadAsStringAsync();
+        }
+        catch (Exception ex)
+        {
+            LogError($"探测百度失败: {ex.Message}");
+            throw;
+        }
 
         if (!body.Contains("/eportal/index.jsp") &&
             !body.Contains("<script>top.self.location.href='http://"))
@@ -29,18 +52,30 @@ public class LoginService : IDisposable
 
         var portalIp = Extract(body, "<script>top.self.location.href='http://", "/eportal/index.jsp");
         var mac = Extract(body, "mac=", "&t=");
-        var encrypted = EncryptService.Encrypt($"{password}>{mac}");
         var queryString = Extract(body, "/eportal/index.jsp?", "'</script>\r\n");
-        var queryStringEnc = Uri.EscapeDataString(queryString);
+        var encrypted = EncryptService.Encrypt($"{password}>{mac}");
+        var postBody = $"userId={username}&password={encrypted}&service=&queryString={Uri.EscapeDataString(queryString)}&passwordEncrypt=true";
 
-        var postBody = $"userId={username}&password={encrypted}&service=&queryString={queryStringEnc}&passwordEncrypt=true";
-
-        var postResp = await _client.PostAsync(
-            $"http://{portalIp}/eportal/InterFace.do?method=login",
-            new StringContent(postBody, System.Text.Encoding.UTF8, "application/x-www-form-urlencoded"));
-
-        var loginResult = await postResp.Content.ReadAsStringAsync();
-        return loginResult.Contains("success");
+        try
+        {
+            using var content = new StringContent(postBody, Encoding.UTF8);
+            content.Headers.ContentType = new("application/x-www-form-urlencoded")
+            {
+                CharSet = "UTF-8"
+            };
+            using var postResponse = await _client.PostAsync(
+                $"http://{portalIp}/eportal/InterFace.do?method=login",
+                content);
+            var loginResult = await postResponse.Content.ReadAsStringAsync();
+            if (!loginResult.Contains("success"))
+                LogError($"登录被拒: {(loginResult.Length > 300 ? loginResult[..300] : loginResult)}");
+            return loginResult.Contains("success");
+        }
+        catch (Exception ex)
+        {
+            LogError($"登录 POST 失败: {ex.Message}");
+            throw;
+        }
     }
 
     private static string Extract(string text, string prefix, string suffix)

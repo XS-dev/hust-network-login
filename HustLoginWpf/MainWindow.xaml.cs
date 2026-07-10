@@ -19,14 +19,29 @@ public partial class MainWindow : Window
     private static readonly SolidColorBrush RedBrush = new(Color.FromRgb(0xEF, 0x44, 0x44));
     private static readonly SolidColorBrush OrangeBrush = new(Color.FromRgb(0xF5, 0x9E, 0x0B));
 
+    private static readonly string LogPath = Path.Combine(
+        AppDomain.CurrentDomain.BaseDirectory, "error.log");
+
+    private static void LogError(string msg)
+    {
+        try
+        {
+            var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ERROR {msg}\n";
+            File.AppendAllText(LogPath, entry);
+        }
+        catch { }
+    }
+
     private Icon? _iconOnline, _iconOffline, _iconChecking, _iconIdle;
     private readonly LoginService _loginService = new();
     private readonly DispatcherTimer _timer = new();
     private NotifyIcon? _notifyIcon;
     private int _countdown;
-    private int _interval = 60;
+    private int _interval = OnlineCheckIntervalSeconds;
     private bool _checking;
     private bool? _online;
+    private const int OnlineCheckIntervalSeconds = 15;
+    private const int RetryIntervalSeconds = 1;
 
     private static readonly string ConfPath = Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "my.conf");
@@ -164,7 +179,7 @@ public partial class MainWindow : Window
     {
         if (_notifyIcon == null) return;
         var s = _online switch { true => "已连接", false => "未连接", null => "等待检测" };
-        var t = _online == false ? "\n断线快速重试中(10s)" : "";
+        var t = _online == false ? $"\n断线快速重试中({RetryIntervalSeconds}s)" : "";
         _notifyIcon.Text = $"HUST 校园网 - {s}{t}";
         _notifyIcon.Icon = _online switch { true => _iconOnline, false => _iconOffline, null => _iconIdle };
     }
@@ -175,6 +190,8 @@ public partial class MainWindow : Window
     private void Shutdown()
     {
         _loginService.Dispose();
+        _timer.Stop();
+        NetworkChange.NetworkAvailabilityChanged -= OnNetworkChanged;
         _iconOnline?.Dispose(); _iconOffline?.Dispose(); _iconChecking?.Dispose(); _iconIdle?.Dispose();
         _notifyIcon?.Dispose();
         System.Windows.Application.Current.Shutdown();
@@ -250,7 +267,11 @@ public partial class MainWindow : Window
             if (!string.IsNullOrEmpty(u) && !string.IsNullOrEmpty(p))
             {
                 var ok = await _loginService.LoginAsync(u, p);
-                Dispatcher.Invoke(() => UpdateStatus(ok));
+                Dispatcher.Invoke(() =>
+                {
+                    _countdown = ok ? _interval : RetryIntervalSeconds;
+                    UpdateStatus(ok);
+                });
             }
             else
             {
@@ -266,10 +287,12 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            LogError($"检测异常: {ex.Message}\n{ex.StackTrace}");
             Dispatcher.Invoke(() =>
             {
                 _online = false;
                 StatusDot.Fill = RedBrush;
+                _countdown = RetryIntervalSeconds;
                 StatusText.Text = $"错误: {ex.Message}";
                 StatusText.Foreground = RedBrush;
                 Icon = IconToImageSource(_iconOffline!);
@@ -287,7 +310,7 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(UpdateCountdownText);
         if (_countdown <= 0)
         {
-            _countdown = _online == false ? 10 : _interval;
+            _countdown = _online == false ? RetryIntervalSeconds : _interval;
             _ = DoCheckAsync();
         }
     }
@@ -295,24 +318,26 @@ public partial class MainWindow : Window
     // ── network change detection ───────────────────────────────
     private void OnNetworkChanged(object? sender, NetworkAvailabilityEventArgs e)
     {
-        if (e.IsAvailable)
+        Dispatcher.BeginInvoke(() =>
         {
-            AddLog("[INFO] 网络恢复，立即检测");
-            _countdown = 3;
-        }
-        else
-        {
-            AddLog("[INFO] 网络断开");
-            Dispatcher.Invoke(() =>
+            if (e.IsAvailable)
             {
-                _online = false;
-                StatusDot.Fill = RedBrush;
-                StatusText.Text = "网络断开";
-                StatusText.Foreground = RedBrush;
-                Icon = IconToImageSource(_iconOffline!);
-                UpdateTray();
-            });
-        }
+                AddLog("[INFO] 网络恢复，3 秒后检测");
+                _countdown = 3;
+                UpdateCountdownText();
+                return;
+            }
+
+            AddLog("[INFO] 网络断开");
+            _online = false;
+            _countdown = RetryIntervalSeconds;
+            StatusDot.Fill = RedBrush;
+            StatusText.Text = "网络断开";
+            StatusText.Foreground = RedBrush;
+            Icon = IconToImageSource(_iconOffline!);
+            UpdateCountdownText();
+            UpdateTray();
+        });
     }
 
     // ── events ─────────────────────────────────────────────────

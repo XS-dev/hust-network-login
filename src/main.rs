@@ -1,7 +1,22 @@
 mod encrypt;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::time::Duration;
 use std::{io, thread};
+
+fn log_error(msg: &str) {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let entry = format!("[{}.{:03}] ERROR {}\n", ts.as_secs(), ts.subsec_millis(), msg);
+    let _ = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("hust-network-login-error.log")
+        .and_then(|mut f| f.write_all(entry.as_bytes()));
+    eprintln!("ERROR: {}", msg);
+}
 
 fn extract<'a>(text: &'a str, prefix: &'a str, suffix: &'a str) -> io::Result<&'a str> {
     let left = text.find(prefix);
@@ -19,11 +34,13 @@ fn login(username: &str, password: &str) -> io::Result<()> {
         .with_timeout(10)
         .send()
         .map_err(|e| {
-            println!("baidu boom! {}", e);
-            io::ErrorKind::ConnectionRefused
+            let msg = format!("探测百度失败: {}", e);
+            log_error(&msg);
+            io::Error::new(io::ErrorKind::Other, msg)
         })?;
     let resp = resp.as_str().map_err(|e| {
-        println!("invalid resp format {}", e);
+        let msg = format!("百度响应非 UTF-8: {}", e);
+        log_error(&msg);
         io::ErrorKind::InvalidData
     })?;
 
@@ -37,15 +54,25 @@ fn login(username: &str, password: &str) -> io::Result<()> {
         resp,
         "<script>top.self.location.href='http://",
         "/eportal/index.jsp",
-    )?;
+    )
+    .map_err(|_| {
+        log_error("提取 portal_ip 失败: 前缀或后缀不匹配");
+        io::Error::from(io::ErrorKind::InvalidData)
+    })?;
     println!("portal ip: {}", portal_ip);
 
-    let mac = extract(resp, "mac=", "&t=")?;
+    let mac = extract(resp, "mac=", "&t=").map_err(|_| {
+        log_error("提取 mac 地址失败: 'mac=' 或 '&t=' 分隔符不匹配");
+        io::Error::from(io::ErrorKind::InvalidData)
+    })?;
     println!("mac: {}", mac);
 
     let encrypt_pass = encrypt::encrypt_pass(format!("{}>{}", password, mac));
 
-    let query_string = extract(resp, "/eportal/index.jsp?", "'</script>\r\n")?;
+    let query_string = extract(resp, "/eportal/index.jsp?", "'</script>\r\n").map_err(|_| {
+        log_error("提取 query_string 失败: 后缀 '\\'</script>\\r\\n' 不匹配，门户页面格式可能已变更");
+        io::Error::from(io::ErrorKind::InvalidData)
+    })?;
     println!("query_string: {}", query_string);
 
     let query_string = urlencoding::encode(query_string);
@@ -68,12 +95,14 @@ fn login(username: &str, password: &str) -> io::Result<()> {
         .with_timeout(10)
         .send()
         .map_err(|e| {
-            println!("portal boom! {}", e);
-            io::ErrorKind::ConnectionRefused
+            let msg = format!("登录 POST 请求失败: {}", e);
+            log_error(&msg);
+            io::Error::new(io::ErrorKind::Other, msg)
         })?;
 
     let resp = resp.as_str().map_err(|e| {
-        println!("invalid login resp format {}", e);
+        let msg = format!("登录响应非 UTF-8: {}", e);
+        log_error(&msg);
         io::ErrorKind::InvalidData
     })?;
 
@@ -82,7 +111,8 @@ fn login(username: &str, password: &str) -> io::Result<()> {
     if resp.contains("success") {
         Ok(())
     } else {
-        Err(io::ErrorKind::PermissionDenied.into())
+        log_error(&format!("登录被拒: 响应不含 'success'。响应体: {}", &resp[..resp.len().min(500)]));
+        Err(io::Error::from(io::ErrorKind::PermissionDenied))
     }
 }
 
@@ -173,7 +203,10 @@ fn main() {
         .or_else(Config::from_env)
         .or_else(|| Config::from_file("/etc/hust-network-login.conf"))
         .or_else(|| Config::from_file("/etc/hust-network-login/config"))
-        .expect("no available configuration found");
+        .unwrap_or_else(|| {
+            log_error("无法找到任何配置来源 (命令行参数/环境变量/配置文件)");
+            panic!("no available configuration found")
+        });
 
     loop {
         match login(&config.username, &config.password) {
@@ -182,7 +215,7 @@ fn main() {
                 thread::sleep(Duration::from_secs(15));
             }
             Err(e) => {
-                println!("error! {}", e);
+                log_error(&format!("登录循环出错: {}", e));
                 thread::sleep(Duration::from_secs(1));
             }
         }
